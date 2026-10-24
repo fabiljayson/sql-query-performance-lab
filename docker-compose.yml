@@ -1,0 +1,31 @@
+name: sql-perf-lab
+
+# Pinned postgres:18-alpine multi-arch digest (day 07 lab, verified 2026-10-24).
+# Update deliberately: docker buildx imagetools inspect postgres:18-alpine
+services:
+  postgres:
+    image: postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
+    container_name: sql-perf-lab-postgres
+    environment:
+      POSTGRES_DB: ${PGDATABASE:-perf_lab}
+      POSTGRES_USER: ${PGUSER:-lab}
+      POSTGRES_PASSWORD: ${PGPASSWORD:?set PGPASSWORD in .env from .env.example}
+    ports:
+      # Bind to loopback only: never exposed on LAN by default.
+      - "127.0.0.1:5434:5432"
+    volumes:
+      # PostgreSQL 18 images expect the mount at the parent directory
+      # (major-version-specific subdirectory, pg_upgrade --link compatible).
+      - perf_lab_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-lab} -d ${PGDATABASE:-perf_lab}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    # Modest shared buffers: the lab runs next to other workloads.
+    command: >-
+      postgres -c shared_buffers=512MB -c work_mem=32MB -c maintenance_work_mem=128MB
+
+volumes:
+  perf_lab_pgdata:

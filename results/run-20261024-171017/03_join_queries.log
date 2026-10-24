@@ -1,0 +1,476 @@
+===== EXPERIMENT 03 — join + FK index + covering index =====
+Time: 24.084 ms
+psql:experiments/03_join_queries.sql:24: NOTICE:  index "idx_orders_customer_covering" does not exist, skipping
+Time: 0.529 ms
+--- 3a Phase 1: baseline, trial 1/3 ---
+                                                                                      QUERY PLAN                                                                                       
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=53419.80..53419.80 rows=1 width=51) (actual time=398.131..412.936 rows=1.00 loops=1)
+   Output: c.id, c.full_name, (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2))
+   Sort Key: (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=33179 read=6811
+   ->  Finalize GroupAggregate  (cost=1063.88..53419.79 rows=1 width=51) (actual time=398.001..412.806 rows=1.00 loops=1)
+         Output: c.id, c.full_name, round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)
+         Buffers: shared hit=33176 read=6811
+         ->  Gather  (cost=1063.88..53419.76 rows=2 width=51) (actual time=397.697..412.758 rows=3.00 loops=1)
+               Output: c.id, c.full_name, (PARTIAL sum(((oi.quantity)::numeric * oi.unit_price)))
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=33176 read=6811
+               ->  Partial GroupAggregate  (cost=63.88..52419.56 rows=1 width=51) (actual time=390.093..390.100 rows=1.00 loops=3)
+                     Output: c.id, c.full_name, PARTIAL sum(((oi.quantity)::numeric * oi.unit_price))
+                     Buffers: shared hit=33176 read=6811
+                     Worker 0:  actual time=387.935..387.942 rows=1.00 loops=1
+                       Buffers: shared hit=9698 read=2231
+                     Worker 1:  actual time=385.380..385.386 rows=1.00 loops=1
+                       Buffers: shared hit=8306 read=2548
+                     ->  Nested Loop  (cost=63.88..52419.44 rows=15 width=29) (actual time=16.095..389.567 rows=205.67 loops=3)
+                           Output: c.id, c.full_name, oi.quantity, oi.unit_price
+                           Buffers: shared hit=33176 read=6811
+                           Worker 0:  actual time=12.195..387.497 rows=168.00 loops=1
+                             Buffers: shared hit=9698 read=2231
+                           Worker 1:  actual time=15.133..384.733 rows=252.00 loops=1
+                             Buffers: shared hit=8306 read=2548
+                           ->  Hash Join  (cost=63.58..52410.94 rows=15 width=18) (actual time=15.977..389.045 rows=205.67 loops=3)
+                                 Output: o.customer_id, oi.quantity, oi.unit_price
+                                 Inner Unique: true
+                                 Hash Cond: (oi.order_id = o.id)
+                                 Buffers: shared hit=33165 read=6811
+                                 Worker 0:  actual time=12.078..387.041 rows=168.00 loops=1
+                                   Buffers: shared hit=9694 read=2231
+                                 Worker 1:  actual time=15.002..384.102 rows=252.00 loops=1
+                                   Buffers: shared hit=8302 read=2548
+                                 ->  Parallel Seq Scan on public.order_items oi  (cost=0.00..49617.48 rows=1039948 width=18) (actual time=11.339..210.273 rows=833370.67 loops=3)
+                                       Output: oi.id, oi.order_id, oi.product_id, oi.quantity, oi.unit_price
+                                       Buffers: shared hit=32407 read=6811
+                                       Worker 0:  actual time=9.196..212.148 rows=788192.00 loops=1
+                                         Buffers: shared hit=9441 read=2231
+                                       Worker 1:  actual time=6.626..204.696 rows=941400.00 loops=1
+                                         Buffers: shared hit=8049 read=2548
+                                 ->  Hash  (cost=63.40..63.40 rows=15 width=16) (actual time=2.697..2.699 rows=248.00 loops=3)
+                                       Output: o.customer_id, o.id
+                                       Buckets: 1024  Batches: 1  Memory Usage: 20kB
+                                       Buffers: shared hit=758
+                                       Worker 0:  actual time=2.572..2.575 rows=248.00 loops=1
+                                         Buffers: shared hit=253
+                                       Worker 1:  actual time=2.968..2.970 rows=248.00 loops=1
+                                         Buffers: shared hit=253
+                                       ->  Bitmap Heap Scan on public.orders o  (cost=4.54..63.40 rows=15 width=16) (actual time=0.383..2.495 rows=248.00 loops=3)
+                                             Output: o.customer_id, o.id
+                                             Recheck Cond: (o.customer_id = 42)
+                                             Heap Blocks: exact=245
+                                             Buffers: shared hit=758
+                                             Worker 0:  actual time=0.318..2.413 rows=248.00 loops=1
+                                               Buffers: shared hit=253
+                                             Worker 1:  actual time=0.420..2.714 rows=248.00 loops=1
+                                               Buffers: shared hit=253
+                                             ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..4.54 rows=15 width=0) (actual time=0.269..0.270 rows=248.00 loops=3)
+                                                   Index Cond: (o.customer_id = 42)
+                                                   Index Searches: 3
+                                                   Buffers: shared hit=23
+                                                   Worker 0:  actual time=0.213..0.213 rows=248.00 loops=1
+                                                     Buffers: shared hit=8
+                                                   Worker 1:  actual time=0.292..0.293 rows=248.00 loops=1
+                                                     Buffers: shared hit=8
+                           ->  Materialize  (cost=0.29..8.32 rows=1 width=19) (actual time=0.001..0.001 rows=1.00 loops=617)
+                                 Output: c.id, c.full_name
+                                 Storage: Memory  Maximum Storage: 17kB
+                                 Buffers: shared hit=11
+                                 Worker 0:  actual time=0.001..0.001 rows=1.00 loops=168
+                                   Buffers: shared hit=4
+                                 Worker 1:  actual time=0.001..0.001 rows=1.00 loops=252
+                                   Buffers: shared hit=4
+                                 ->  Index Scan using customers_pkey on public.customers c  (cost=0.29..8.31 rows=1 width=19) (actual time=0.083..0.084 rows=1.00 loops=3)
+                                       Output: c.id, c.full_name
+                                       Index Cond: (c.id = 42)
+                                       Index Searches: 3
+                                       Buffers: shared hit=11
+                                       Worker 0:  actual time=0.083..0.085 rows=1.00 loops=1
+                                         Buffers: shared hit=4
+                                       Worker 1:  actual time=0.080..0.083 rows=1.00 loops=1
+                                         Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=408
+ Planning Time: 7.824 ms
+ Execution Time: 413.259 ms
+(89 rows)
+
+Time: 426.775 ms
+--- 3a Phase 1: baseline, trial 2/3 ---
+                                                                                      QUERY PLAN                                                                                       
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=53419.80..53419.80 rows=1 width=51) (actual time=353.402..365.245 rows=1.00 loops=1)
+   Output: c.id, c.full_name, (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2))
+   Sort Key: (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=34037 read=5947
+   ->  Finalize GroupAggregate  (cost=1063.88..53419.79 rows=1 width=51) (actual time=353.376..365.218 rows=1.00 loops=1)
+         Output: c.id, c.full_name, round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)
+         Buffers: shared hit=34037 read=5947
+         ->  Gather  (cost=1063.88..53419.76 rows=2 width=51) (actual time=353.143..365.190 rows=3.00 loops=1)
+               Output: c.id, c.full_name, (PARTIAL sum(((oi.quantity)::numeric * oi.unit_price)))
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=34037 read=5947
+               ->  Partial GroupAggregate  (cost=63.88..52419.56 rows=1 width=51) (actual time=322.157..322.162 rows=1.00 loops=3)
+                     Output: c.id, c.full_name, PARTIAL sum(((oi.quantity)::numeric * oi.unit_price))
+                     Buffers: shared hit=34037 read=5947
+                     Worker 0:  actual time=302.849..302.854 rows=1.00 loops=1
+                       Buffers: shared hit=4511 read=1716
+                     Worker 1:  actual time=311.065..311.069 rows=1.00 loops=1
+                       Buffers: shared hit=6133 read=2442
+                     ->  Nested Loop  (cost=63.88..52419.44 rows=15 width=29) (actual time=15.373..321.702 rows=205.67 loops=3)
+                           Output: c.id, c.full_name, oi.quantity, oi.unit_price
+                           Buffers: shared hit=34037 read=5947
+                           Worker 0:  actual time=9.080..302.469 rows=197.00 loops=1
+                             Buffers: shared hit=4511 read=1716
+                           Worker 1:  actual time=8.241..310.575 rows=217.00 loops=1
+                             Buffers: shared hit=6133 read=2442
+                           ->  Hash Join  (cost=63.58..52410.94 rows=15 width=18) (actual time=15.258..321.236 rows=205.67 loops=3)
+                                 Output: o.customer_id, oi.quantity, oi.unit_price
+                                 Inner Unique: true
+                                 Hash Cond: (oi.order_id = o.id)
+                                 Buffers: shared hit=34026 read=5947
+                                 Worker 0:  actual time=8.954..301.995 rows=197.00 loops=1
+                                   Buffers: shared hit=4507 read=1716
+                                 Worker 1:  actual time=8.103..310.067 rows=217.00 loops=1
+                                   Buffers: shared hit=6129 read=2442
+                                 ->  Parallel Seq Scan on public.order_items oi  (cost=0.00..49617.48 rows=1039948 width=18) (actual time=9.139..131.242 rows=833370.67 loops=3)
+                                       Output: oi.id, oi.order_id, oi.product_id, oi.quantity, oi.unit_price
+                                       Buffers: shared hit=33271 read=5947
+                                       Worker 0:  actual time=0.033..114.858 rows=716334.00 loops=1
+                                         Buffers: shared hit=4254 read=1716
+                                       Worker 1:  actual time=0.042..125.905 rows=998160.00 loops=1
+                                         Buffers: shared hit=5876 read=2442
+                                 ->  Hash  (cost=63.40..63.40 rows=15 width=16) (actual time=2.676..2.677 rows=248.00 loops=3)
+                                       Output: o.customer_id, o.id
+                                       Buckets: 1024  Batches: 1  Memory Usage: 20kB
+                                       Buffers: shared hit=755
+                                       Worker 0:  actual time=3.377..3.379 rows=248.00 loops=1
+                                         Buffers: shared hit=253
+                                       Worker 1:  actual time=3.529..3.530 rows=248.00 loops=1
+                                         Buffers: shared hit=253
+                                       ->  Bitmap Heap Scan on public.orders o  (cost=4.54..63.40 rows=15 width=16) (actual time=0.330..2.482 rows=248.00 loops=3)
+                                             Output: o.customer_id, o.id
+                                             Recheck Cond: (o.customer_id = 42)
+                                             Heap Blocks: exact=245
+                                             Buffers: shared hit=755
+                                             Worker 0:  actual time=0.349..3.187 rows=248.00 loops=1
+                                               Buffers: shared hit=253
+                                             Worker 1:  actual time=0.363..3.327 rows=248.00 loops=1
+                                               Buffers: shared hit=253
+                                             ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..4.54 rows=15 width=0) (actual time=0.217..0.218 rows=248.00 loops=3)
+                                                   Index Cond: (o.customer_id = 42)
+                                                   Index Searches: 3
+                                                   Buffers: shared hit=20
+                                                   Worker 0:  actual time=0.230..0.230 rows=248.00 loops=1
+                                                     Buffers: shared hit=8
+                                                   Worker 1:  actual time=0.243..0.243 rows=248.00 loops=1
+                                                     Buffers: shared hit=8
+                           ->  Materialize  (cost=0.29..8.32 rows=1 width=19) (actual time=0.001..0.001 rows=1.00 loops=617)
+                                 Output: c.id, c.full_name
+                                 Storage: Memory  Maximum Storage: 17kB
+                                 Buffers: shared hit=11
+                                 Worker 0:  actual time=0.001..0.001 rows=1.00 loops=197
+                                   Buffers: shared hit=4
+                                 Worker 1:  actual time=0.001..0.001 rows=1.00 loops=217
+                                   Buffers: shared hit=4
+                                 ->  Index Scan using customers_pkey on public.customers c  (cost=0.29..8.31 rows=1 width=19) (actual time=0.078..0.080 rows=1.00 loops=3)
+                                       Output: c.id, c.full_name
+                                       Index Cond: (c.id = 42)
+                                       Index Searches: 3
+                                       Buffers: shared hit=11
+                                       Worker 0:  actual time=0.086..0.088 rows=1.00 loops=1
+                                         Buffers: shared hit=4
+                                       Worker 1:  actual time=0.093..0.095 rows=1.00 loops=1
+                                         Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=170
+ Planning Time: 3.688 ms
+ Execution Time: 365.571 ms
+(89 rows)
+
+Time: 370.692 ms
+--- 3a Phase 1: baseline, trial 3/3 ---
+                                                                                      QUERY PLAN                                                                                       
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=53419.80..53419.80 rows=1 width=51) (actual time=311.230..324.998 rows=1.00 loops=1)
+   Output: c.id, c.full_name, (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2))
+   Sort Key: (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=34901 read=5083
+   ->  Finalize GroupAggregate  (cost=1063.88..53419.79 rows=1 width=51) (actual time=311.207..324.974 rows=1.00 loops=1)
+         Output: c.id, c.full_name, round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)
+         Buffers: shared hit=34901 read=5083
+         ->  Gather  (cost=1063.88..53419.76 rows=2 width=51) (actual time=310.869..324.943 rows=3.00 loops=1)
+               Output: c.id, c.full_name, (PARTIAL sum(((oi.quantity)::numeric * oi.unit_price)))
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=34901 read=5083
+               ->  Partial GroupAggregate  (cost=63.88..52419.56 rows=1 width=51) (actual time=298.219..298.227 rows=1.00 loops=3)
+                     Output: c.id, c.full_name, PARTIAL sum(((oi.quantity)::numeric * oi.unit_price))
+                     Buffers: shared hit=34901 read=5083
+                     Worker 0:  actual time=293.235..293.242 rows=1.00 loops=1
+                       Buffers: shared hit=7372 read=1585
+                     Worker 1:  actual time=291.295..291.302 rows=1.00 loops=1
+                       Buffers: shared hit=5698 read=1680
+                     ->  Nested Loop  (cost=63.88..52419.44 rows=15 width=29) (actual time=11.494..297.747 rows=205.67 loops=3)
+                           Output: c.id, c.full_name, oi.quantity, oi.unit_price
+                           Buffers: shared hit=34901 read=5083
+                           Worker 0:  actual time=7.503..292.738 rows=210.00 loops=1
+                             Buffers: shared hit=7372 read=1585
+                           Worker 1:  actual time=5.098..290.868 rows=212.00 loops=1
+                             Buffers: shared hit=5698 read=1680
+                           ->  Hash Join  (cost=63.58..52410.94 rows=15 width=18) (actual time=11.409..297.301 rows=205.67 loops=3)
+                                 Output: o.customer_id, oi.quantity, oi.unit_price
+                                 Inner Unique: true
+                                 Hash Cond: (oi.order_id = o.id)
+                                 Buffers: shared hit=34890 read=5083
+                                 Worker 0:  actual time=7.417..292.298 rows=210.00 loops=1
+                                   Buffers: shared hit=7368 read=1585
+                                 Worker 1:  actual time=4.983..290.363 rows=212.00 loops=1
+                                   Buffers: shared hit=5694 read=1680
+                                 ->  Parallel Seq Scan on public.order_items oi  (cost=0.00..49617.48 rows=1039948 width=18) (actual time=8.517..123.860 rows=833370.67 loops=3)
+                                       Output: oi.id, oi.order_id, oi.product_id, oi.quantity, oi.unit_price
+                                       Buffers: shared hit=34135 read=5083
+                                       Worker 0:  actual time=3.560..118.103 rows=828960.00 loops=1
+                                         Buffers: shared hit=7115 read=1585
+                                       Worker 1:  actual time=1.581..115.649 rows=785334.00 loops=1
+                                         Buffers: shared hit=5441 read=1680
+                                 ->  Hash  (cost=63.40..63.40 rows=15 width=16) (actual time=2.291..2.294 rows=248.00 loops=3)
+                                       Output: o.customer_id, o.id
+                                       Buckets: 1024  Batches: 1  Memory Usage: 20kB
+                                       Buffers: shared hit=755
+                                       Worker 0:  actual time=2.397..2.399 rows=248.00 loops=1
+                                         Buffers: shared hit=253
+                                       Worker 1:  actual time=3.292..3.295 rows=248.00 loops=1
+                                         Buffers: shared hit=253
+                                       ->  Bitmap Heap Scan on public.orders o  (cost=4.54..63.40 rows=15 width=16) (actual time=0.369..2.112 rows=248.00 loops=3)
+                                             Output: o.customer_id, o.id
+                                             Recheck Cond: (o.customer_id = 42)
+                                             Heap Blocks: exact=245
+                                             Buffers: shared hit=755
+                                             Worker 0:  actual time=0.349..2.275 rows=248.00 loops=1
+                                               Buffers: shared hit=253
+                                             Worker 1:  actual time=0.389..3.058 rows=248.00 loops=1
+                                               Buffers: shared hit=253
+                                             ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..4.54 rows=15 width=0) (actual time=0.269..0.269 rows=248.00 loops=3)
+                                                   Index Cond: (o.customer_id = 42)
+                                                   Index Searches: 3
+                                                   Buffers: shared hit=20
+                                                   Worker 0:  actual time=0.249..0.250 rows=248.00 loops=1
+                                                     Buffers: shared hit=8
+                                                   Worker 1:  actual time=0.280..0.280 rows=248.00 loops=1
+                                                     Buffers: shared hit=8
+                           ->  Materialize  (cost=0.29..8.32 rows=1 width=19) (actual time=0.001..0.001 rows=1.00 loops=617)
+                                 Output: c.id, c.full_name
+                                 Storage: Memory  Maximum Storage: 17kB
+                                 Buffers: shared hit=11
+                                 Worker 0:  actual time=0.001..0.001 rows=1.00 loops=210
+                                   Buffers: shared hit=4
+                                 Worker 1:  actual time=0.001..0.001 rows=1.00 loops=212
+                                   Buffers: shared hit=4
+                                 ->  Index Scan using customers_pkey on public.customers c  (cost=0.29..8.31 rows=1 width=19) (actual time=0.059..0.060 rows=1.00 loops=3)
+                                       Output: c.id, c.full_name
+                                       Index Cond: (c.id = 42)
+                                       Index Searches: 3
+                                       Buffers: shared hit=11
+                                       Worker 0:  actual time=0.059..0.061 rows=1.00 loops=1
+                                         Buffers: shared hit=4
+                                       Worker 1:  actual time=0.080..0.081 rows=1.00 loops=1
+                                         Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=158
+ Planning Time: 2.609 ms
+ Execution Time: 325.304 ms
+(89 rows)
+
+Time: 329.278 ms
+Time: 1655.703 ms (00:01.656)
+Time: 285.021 ms
+--- 3a Phase 2: after FK index, trial 1/3 ---
+                                                                               QUERY PLAN                                                                               
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=200.26..200.26 rows=1 width=51) (actual time=6.106..6.110 rows=1.00 loops=1)
+   Output: c.id, c.full_name, (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2))
+   Sort Key: (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=989 read=259
+   ->  GroupAggregate  (cost=5.26..200.25 rows=1 width=51) (actual time=6.077..6.080 rows=1.00 loops=1)
+         Output: c.id, c.full_name, round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)
+         Buffers: shared hit=989 read=259
+         ->  Nested Loop  (cost=5.26..199.96 rows=37 width=29) (actual time=0.304..5.582 rows=617.00 loops=1)
+               Output: c.id, c.full_name, oi.quantity, oi.unit_price
+               Buffers: shared hit=989 read=259
+               ->  Nested Loop  (cost=4.83..71.86 rows=15 width=27) (actual time=0.261..0.930 rows=248.00 loops=1)
+                     Output: c.id, c.full_name, o.id
+                     Buffers: shared hit=252
+                     ->  Index Scan using customers_pkey on public.customers c  (cost=0.29..8.31 rows=1 width=19) (actual time=0.054..0.056 rows=1.00 loops=1)
+                           Output: c.id, c.full_name, c.email, c.city, c.created_at
+                           Index Cond: (c.id = 42)
+                           Index Searches: 1
+                           Buffers: shared hit=3
+                     ->  Bitmap Heap Scan on public.orders o  (cost=4.54..63.40 rows=15 width=16) (actual time=0.199..0.774 rows=248.00 loops=1)
+                           Output: o.id, o.customer_id, o.status, o.total_amount, o.created_at
+                           Recheck Cond: (o.customer_id = 42)
+                           Heap Blocks: exact=245
+                           Buffers: shared hit=249
+                           ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..4.54 rows=15 width=0) (actual time=0.117..0.118 rows=248.00 loops=1)
+                                 Index Cond: (o.customer_id = 42)
+                                 Index Searches: 1
+                                 Buffers: shared hit=4
+               ->  Index Scan using idx_order_items_order_id on public.order_items oi  (cost=0.43..8.50 rows=4 width=18) (actual time=0.016..0.017 rows=2.49 loops=248)
+                     Output: oi.id, oi.order_id, oi.product_id, oi.quantity, oi.unit_price
+                     Index Cond: (oi.order_id = o.id)
+                     Index Searches: 248
+                     Buffers: shared hit=737 read=259
+ Planning:
+   Buffers: shared hit=123 read=6
+ Planning Time: 1.123 ms
+ Execution Time: 6.309 ms
+(37 rows)
+
+Time: 8.817 ms
+--- 3a Phase 2: after FK index, trial 2/3 ---
+                                                                               QUERY PLAN                                                                               
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=200.26..200.26 rows=1 width=51) (actual time=2.476..2.480 rows=1.00 loops=1)
+   Output: c.id, c.full_name, (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2))
+   Sort Key: (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=1248
+   ->  GroupAggregate  (cost=5.26..200.25 rows=1 width=51) (actual time=2.459..2.461 rows=1.00 loops=1)
+         Output: c.id, c.full_name, round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)
+         Buffers: shared hit=1248
+         ->  Nested Loop  (cost=5.26..199.96 rows=37 width=29) (actual time=0.201..2.199 rows=617.00 loops=1)
+               Output: c.id, c.full_name, oi.quantity, oi.unit_price
+               Buffers: shared hit=1248
+               ->  Nested Loop  (cost=4.83..71.86 rows=15 width=27) (actual time=0.179..0.590 rows=248.00 loops=1)
+                     Output: c.id, c.full_name, o.id
+                     Buffers: shared hit=252
+                     ->  Index Scan using customers_pkey on public.customers c  (cost=0.29..8.31 rows=1 width=19) (actual time=0.026..0.028 rows=1.00 loops=1)
+                           Output: c.id, c.full_name, c.email, c.city, c.created_at
+                           Index Cond: (c.id = 42)
+                           Index Searches: 1
+                           Buffers: shared hit=3
+                     ->  Bitmap Heap Scan on public.orders o  (cost=4.54..63.40 rows=15 width=16) (actual time=0.148..0.508 rows=248.00 loops=1)
+                           Output: o.id, o.customer_id, o.status, o.total_amount, o.created_at
+                           Recheck Cond: (o.customer_id = 42)
+                           Heap Blocks: exact=245
+                           Buffers: shared hit=249
+                           ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..4.54 rows=15 width=0) (actual time=0.085..0.085 rows=248.00 loops=1)
+                                 Index Cond: (o.customer_id = 42)
+                                 Index Searches: 1
+                                 Buffers: shared hit=4
+               ->  Index Scan using idx_order_items_order_id on public.order_items oi  (cost=0.43..8.50 rows=4 width=18) (actual time=0.005..0.006 rows=2.49 loops=248)
+                     Output: oi.id, oi.order_id, oi.product_id, oi.quantity, oi.unit_price
+                     Index Cond: (oi.order_id = o.id)
+                     Index Searches: 248
+                     Buffers: shared hit=996
+ Planning:
+   Buffers: shared hit=98
+ Planning Time: 0.793 ms
+ Execution Time: 2.625 ms
+(37 rows)
+
+Time: 4.187 ms
+--- 3a Phase 2: after FK index, trial 3/3 ---
+                                                                               QUERY PLAN                                                                               
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=200.26..200.26 rows=1 width=51) (actual time=2.474..2.477 rows=1.00 loops=1)
+   Output: c.id, c.full_name, (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2))
+   Sort Key: (round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=1248
+   ->  GroupAggregate  (cost=5.26..200.25 rows=1 width=51) (actual time=2.458..2.460 rows=1.00 loops=1)
+         Output: c.id, c.full_name, round(sum(((oi.quantity)::numeric * oi.unit_price)), 2)
+         Buffers: shared hit=1248
+         ->  Nested Loop  (cost=5.26..199.96 rows=37 width=29) (actual time=0.200..2.194 rows=617.00 loops=1)
+               Output: c.id, c.full_name, oi.quantity, oi.unit_price
+               Buffers: shared hit=1248
+               ->  Nested Loop  (cost=4.83..71.86 rows=15 width=27) (actual time=0.174..0.579 rows=248.00 loops=1)
+                     Output: c.id, c.full_name, o.id
+                     Buffers: shared hit=252
+                     ->  Index Scan using customers_pkey on public.customers c  (cost=0.29..8.31 rows=1 width=19) (actual time=0.025..0.026 rows=1.00 loops=1)
+                           Output: c.id, c.full_name, c.email, c.city, c.created_at
+                           Index Cond: (c.id = 42)
+                           Index Searches: 1
+                           Buffers: shared hit=3
+                     ->  Bitmap Heap Scan on public.orders o  (cost=4.54..63.40 rows=15 width=16) (actual time=0.146..0.501 rows=248.00 loops=1)
+                           Output: o.id, o.customer_id, o.status, o.total_amount, o.created_at
+                           Recheck Cond: (o.customer_id = 42)
+                           Heap Blocks: exact=245
+                           Buffers: shared hit=249
+                           ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..4.54 rows=15 width=0) (actual time=0.085..0.085 rows=248.00 loops=1)
+                                 Index Cond: (o.customer_id = 42)
+                                 Index Searches: 1
+                                 Buffers: shared hit=4
+               ->  Index Scan using idx_order_items_order_id on public.order_items oi  (cost=0.43..8.50 rows=4 width=18) (actual time=0.005..0.006 rows=2.49 loops=248)
+                     Output: oi.id, oi.order_id, oi.product_id, oi.quantity, oi.unit_price
+                     Index Cond: (oi.order_id = o.id)
+                     Index Searches: 248
+                     Buffers: shared hit=996
+ Planning:
+   Buffers: shared hit=98
+ Planning Time: 0.685 ms
+ Execution Time: 2.607 ms
+(37 rows)
+
+Time: 3.932 ms
+--- 3b Phase 1: baseline for covering demo (with composite index present; total_amount requires heap fetches) ---
+                                                                          QUERY PLAN                                                                          
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ HashAggregate  (cost=21621.75..22259.16 rows=50993 width=40) (actual time=101.506..102.133 rows=1000.00 loops=1)
+   Output: customer_id, sum(total_amount)
+   Group Key: orders.customer_id
+   Batches: 1  Memory Usage: 1617kB
+   Buffers: shared hit=8942 read=381
+   ->  Bitmap Heap Scan on public.orders  (cost=2543.03..21126.82 rows=98986 width=15) (actual time=16.320..53.463 rows=100188.00 loops=1)
+         Output: id, customer_id, status, total_amount, created_at
+         Recheck Cond: ((orders.customer_id >= 1) AND (orders.customer_id <= 1000))
+         Heap Blocks: exact=8937
+         Buffers: shared hit=8942 read=381
+         ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..2518.29 rows=98986 width=0) (actual time=13.717..13.718 rows=100188.00 loops=1)
+               Index Cond: ((orders.customer_id >= 1) AND (orders.customer_id <= 1000))
+               Index Searches: 1
+               Buffers: shared hit=5 read=381
+ Planning:
+   Buffers: shared hit=12 read=1
+ Planning Time: 0.383 ms
+ Execution Time: 103.711 ms
+(18 rows)
+
+Time: 104.905 ms
+Time: 1541.437 ms (00:01.541)
+Time: 216.651 ms
+--- 3b Phase 2: after covering index (index-only scan possible thanks to VACUUM-ed visibility map) ---
+                                                                               QUERY PLAN                                                                               
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=0.42..6201.02 rows=50407 width=40) (actual time=2.406..57.562 rows=1000.00 loops=1)
+   Output: customer_id, sum(total_amount)
+   Group Key: orders.customer_id
+   Buffers: shared hit=4 read=514
+   ->  Index Only Scan using idx_orders_customer_covering on public.orders  (cost=0.42..5078.43 rows=98502 width=15) (actual time=0.047..27.577 rows=100188.00 loops=1)
+         Output: customer_id, created_at, total_amount
+         Index Cond: ((orders.customer_id >= 1) AND (orders.customer_id <= 1000))
+         Heap Fetches: 0
+         Index Searches: 1
+         Buffers: shared hit=4 read=514
+ Planning:
+   Buffers: shared hit=25 read=4
+ Planning Time: 0.788 ms
+ Execution Time: 57.717 ms
+(14 rows)
+
+Time: 59.398 ms
+--- 3b The index is DROPPED: leading columns duplicate idx_orders_customer_created_at (redundancy, §7.5) ---
+Time: 14.143 ms
+--- FK index size ---
+        index_name        | size  
+--------------------------+-------
+ idx_order_items_order_id | 39 MB
+(1 row)
+
+Time: 2.885 ms
+===== EXPERIMENT 03 done — FK index kept, covering index dropped =====

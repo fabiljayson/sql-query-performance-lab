@@ -1,0 +1,27 @@
+# Secrets — never commit
+.env
+*.key
+*.pem
+
+# Generated data / benchmark artifacts — fresh runs are local noise,
+# but the canonical measured run referenced by findings.md is tracked explicitly.
+results/*
+!results/.gitkeep
+!results/latest_run.txt
+!results/run-20261024-171017/
+!results/run-20261024-171017/**
+*.log
+!results/run-20261024-171017/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Editors/OS
+.idea/
+.vscode/
+.DS_Store

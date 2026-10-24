@@ -1,0 +1,145 @@
+===== EXPERIMENT 05 — write overhead =====
+Time: 21.386 ms
+Time: 15.218 ms
+Time: 20.774 ms
+Time: 4.527 ms
+--- Phase 1: bare tables, trial 1/3 (5 000-row INSERT, rolled back) ---
+Time: 0.227 ms
+ setseed 
+---------
+ 
+(1 row)
+
+Time: 1.049 ms
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on orders  (cost=0.00..375.00 rows=0 width=0) (actual time=52.954..52.957 rows=0.00 loops=1)
+   Buffers: shared hit=15270 read=3 dirtied=58 written=13
+   ->  Subquery Scan on "*SELECT*"  (cost=0.00..375.00 rows=5000 width=72) (actual time=0.919..25.089 rows=5000.00 loops=1)
+         Buffers: shared hit=5008 read=3
+         ->  Subquery Scan on s  (cost=0.00..350.00 rows=5000 width=80) (actual time=0.711..17.887 rows=5000.00 loops=1)
+               ->  Subquery Scan on g  (cost=0.00..187.50 rows=5000 width=72) (actual time=0.704..12.684 rows=5000.00 loops=1)
+                     ->  Function Scan on generate_series  (cost=0.00..62.50 rows=5000 width=8) (actual time=0.688..2.150 rows=5000.00 loops=1)
+ Planning Time: 0.215 ms
+ Trigger for constraint orders_customer_id_fkey: time=193.493 calls=5000
+ Execution Time: 247.434 ms
+(10 rows)
+
+Time: 251.939 ms
+--- Phase 1: bare tables, trial 2/3 ---
+ setseed 
+---------
+ 
+(1 row)
+
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on orders  (cost=0.00..375.00 rows=0 width=0) (actual time=50.526..50.528 rows=0.00 loops=1)
+   Buffers: shared hit=15216 dirtied=58 written=14
+   ->  Subquery Scan on "*SELECT*"  (cost=0.00..375.00 rows=5000 width=72) (actual time=0.732..24.266 rows=5000.00 loops=1)
+         Buffers: shared hit=5000
+         ->  Subquery Scan on s  (cost=0.00..350.00 rows=5000 width=80) (actual time=0.722..17.555 rows=5000.00 loops=1)
+               ->  Subquery Scan on g  (cost=0.00..187.50 rows=5000 width=72) (actual time=0.716..12.471 rows=5000.00 loops=1)
+                     ->  Function Scan on generate_series  (cost=0.00..62.50 rows=5000 width=8) (actual time=0.702..2.066 rows=5000.00 loops=1)
+ Planning Time: 0.144 ms
+ Trigger for constraint orders_customer_id_fkey: time=193.236 calls=5000
+ Execution Time: 244.654 ms
+(10 rows)
+
+Time: 245.504 ms
+--- Phase 1: bare tables, trial 3/3 ---
+ setseed 
+---------
+ 
+(1 row)
+
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on orders  (cost=0.00..375.00 rows=0 width=0) (actual time=61.845..61.848 rows=0.00 loops=1)
+   Buffers: shared hit=15213 dirtied=58 written=13
+   ->  Subquery Scan on "*SELECT*"  (cost=0.00..375.00 rows=5000 width=72) (actual time=1.229..29.428 rows=5000.00 loops=1)
+         Buffers: shared hit=5000
+         ->  Subquery Scan on s  (cost=0.00..350.00 rows=5000 width=80) (actual time=1.217..21.289 rows=5000.00 loops=1)
+               ->  Subquery Scan on g  (cost=0.00..187.50 rows=5000 width=72) (actual time=1.208..15.280 rows=5000.00 loops=1)
+                     ->  Function Scan on generate_series  (cost=0.00..62.50 rows=5000 width=8) (actual time=1.189..2.892 rows=5000.00 loops=1)
+ Planning Time: 0.310 ms
+ Trigger for constraint orders_customer_id_fkey: time=211.300 calls=5000
+ Execution Time: 274.198 ms
+(10 rows)
+
+Time: 275.569 ms
+--- Phase 2: re-apply the retained index set (single DDL source) ---
+Retained index set applied.
+--- Phase 2: with indexes, trial 1/3 (5 000-row INSERT, rolled back) ---
+ setseed 
+---------
+ 
+(1 row)
+
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on orders  (cost=0.00..375.00 rows=0 width=0) (actual time=146.858..146.860 rows=0.00 loops=1)
+   Buffers: shared hit=39538 read=5882 dirtied=5889 written=14
+   ->  Subquery Scan on "*SELECT*"  (cost=0.00..375.00 rows=5000 width=72) (actual time=0.681..23.420 rows=5000.00 loops=1)
+         Buffers: shared hit=5000
+         ->  Subquery Scan on s  (cost=0.00..350.00 rows=5000 width=80) (actual time=0.670..16.756 rows=5000.00 loops=1)
+               ->  Subquery Scan on g  (cost=0.00..187.50 rows=5000 width=72) (actual time=0.663..11.843 rows=5000.00 loops=1)
+                     ->  Function Scan on generate_series  (cost=0.00..62.50 rows=5000 width=8) (actual time=0.647..2.208 rows=5000.00 loops=1)
+ Planning Time: 0.145 ms
+ Trigger for constraint orders_customer_id_fkey: time=168.066 calls=5000
+ Execution Time: 315.742 ms
+(10 rows)
+
+Time: 316.582 ms
+--- Phase 2: with indexes, trial 2/3 ---
+ setseed 
+---------
+ 
+(1 row)
+
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on orders  (cost=0.00..375.00 rows=0 width=0) (actual time=123.654..123.656 rows=0.00 loops=1)
+   Buffers: shared hit=43630 read=1734 dirtied=1794 written=23
+   ->  Subquery Scan on "*SELECT*"  (cost=0.00..375.00 rows=5000 width=72) (actual time=0.739..23.131 rows=5000.00 loops=1)
+         Buffers: shared hit=5000
+         ->  Subquery Scan on s  (cost=0.00..350.00 rows=5000 width=80) (actual time=0.717..16.540 rows=5000.00 loops=1)
+               ->  Subquery Scan on g  (cost=0.00..187.50 rows=5000 width=72) (actual time=0.708..11.696 rows=5000.00 loops=1)
+                     ->  Function Scan on generate_series  (cost=0.00..62.50 rows=5000 width=8) (actual time=0.694..2.165 rows=5000.00 loops=1)
+ Planning Time: 0.132 ms
+ Trigger for constraint orders_customer_id_fkey: time=173.729 calls=5000
+ Execution Time: 298.193 ms
+(10 rows)
+
+Time: 299.023 ms
+--- Phase 2: with indexes, trial 3/3 ---
+ setseed 
+---------
+ 
+(1 row)
+
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on orders  (cost=0.00..375.00 rows=0 width=0) (actual time=118.778..118.780 rows=0.00 loops=1)
+   Buffers: shared hit=44806 read=565 dirtied=623 written=13
+   ->  Subquery Scan on "*SELECT*"  (cost=0.00..375.00 rows=5000 width=72) (actual time=0.664..23.575 rows=5000.00 loops=1)
+         Buffers: shared hit=5000
+         ->  Subquery Scan on s  (cost=0.00..350.00 rows=5000 width=80) (actual time=0.656..16.921 rows=5000.00 loops=1)
+               ->  Subquery Scan on g  (cost=0.00..187.50 rows=5000 width=72) (actual time=0.649..12.005 rows=5000.00 loops=1)
+                     ->  Function Scan on generate_series  (cost=0.00..62.50 rows=5000 width=8) (actual time=0.637..2.119 rows=5000.00 loops=1)
+ Planning Time: 0.145 ms
+ Trigger for constraint orders_customer_id_fkey: time=214.176 calls=5000
+ Execution Time: 333.927 ms
+(10 rows)
+
+Time: 334.911 ms
+--- Per-index storage after experiment 5 ---
+           index_name           | index_size 
+--------------------------------+------------
+ idx_order_items_order_id       | 39 MB
+ idx_orders_customer_created_at | 30 MB
+ idx_orders_pending_recent      | 336 kB
+ idx_orders_status_created_at   | 35 MB
+(4 rows)
+
+===== EXPERIMENT 05 done — every trial was rolled back =====

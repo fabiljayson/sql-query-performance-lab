@@ -1,0 +1,3 @@
+# Dev-only requirements for the pytest invariant suite.
+pytest>=8.0
+psycopg[binary]>=3.2

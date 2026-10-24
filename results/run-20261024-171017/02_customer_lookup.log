@@ -1,0 +1,263 @@
+===== EXPERIMENT 02 — customer lookup + newest-20 sort =====
+psql:experiments/02_customer_lookup.sql:22: NOTICE:  index "idx_orders_customer_id" does not exist, skipping
+Time: 1.041 ms
+Time: 16.738 ms
+--- Phase 1: baseline, trial 1/3 (Seq Scan + top-N sort expected) ---
+                                                                 QUERY PLAN                                                                 
+--------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=23309.25..23309.29 rows=16 width=31) (actual time=71.502..85.870 rows=20.00 loops=1)
+   Output: id, status, total_amount, created_at
+   Buffers: shared hit=17102
+   ->  Sort  (cost=23309.25..23309.29 rows=16 width=31) (actual time=71.499..85.860 rows=20.00 loops=1)
+         Output: id, status, total_amount, created_at
+         Sort Key: orders.created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=17102
+         ->  Gather  (cost=1000.00..23308.93 rows=16 width=31) (actual time=12.911..85.583 rows=248.00 loops=1)
+               Output: id, status, total_amount, created_at
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=17099
+               ->  Parallel Seq Scan on public.orders  (cost=0.00..22307.33 rows=7 width=31) (actual time=6.271..63.654 rows=82.67 loops=3)
+                     Output: id, status, total_amount, created_at
+                     Filter: (orders.customer_id = 42)
+                     Rows Removed by Filter: 333251
+                     Buffers: shared hit=17099
+                     Worker 0:  actual time=4.181..60.311 rows=81.00 loops=1
+                       Buffers: shared hit=3317
+                     Worker 1:  actual time=2.385..60.313 rows=70.00 loops=1
+                       Buffers: shared hit=3262
+ Planning:
+   Buffers: shared hit=136
+ Planning Time: 2.325 ms
+ Execution Time: 86.025 ms
+(26 rows)
+
+Time: 92.974 ms
+--- Phase 1: baseline, trial 2/3 ---
+                                                                 QUERY PLAN                                                                 
+--------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=23309.25..23309.29 rows=16 width=31) (actual time=69.766..79.762 rows=20.00 loops=1)
+   Output: id, status, total_amount, created_at
+   Buffers: shared hit=17099
+   ->  Sort  (cost=23309.25..23309.29 rows=16 width=31) (actual time=69.764..79.754 rows=20.00 loops=1)
+         Output: id, status, total_amount, created_at
+         Sort Key: orders.created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=17099
+         ->  Gather  (cost=1000.00..23308.93 rows=16 width=31) (actual time=12.497..79.491 rows=248.00 loops=1)
+               Output: id, status, total_amount, created_at
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=17099
+               ->  Parallel Seq Scan on public.orders  (cost=0.00..22307.33 rows=7 width=31) (actual time=4.697..62.118 rows=82.67 loops=3)
+                     Output: id, status, total_amount, created_at
+                     Filter: (orders.customer_id = 42)
+                     Rows Removed by Filter: 333251
+                     Buffers: shared hit=17099
+                     Worker 0:  actual time=1.194..57.762 rows=67.00 loops=1
+                       Buffers: shared hit=2419
+                     Worker 1:  actual time=0.811..59.697 rows=94.00 loops=1
+                       Buffers: shared hit=3854
+ Planning Time: 0.195 ms
+ Execution Time: 79.820 ms
+(24 rows)
+
+Time: 80.731 ms
+--- Phase 1: baseline, trial 3/3 ---
+                                                                 QUERY PLAN                                                                 
+--------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=23309.25..23309.29 rows=16 width=31) (actual time=62.975..72.625 rows=20.00 loops=1)
+   Output: id, status, total_amount, created_at
+   Buffers: shared hit=17099
+   ->  Sort  (cost=23309.25..23309.29 rows=16 width=31) (actual time=62.973..72.616 rows=20.00 loops=1)
+         Output: id, status, total_amount, created_at
+         Sort Key: orders.created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=17099
+         ->  Gather  (cost=1000.00..23308.93 rows=16 width=31) (actual time=7.092..72.377 rows=248.00 loops=1)
+               Output: id, status, total_amount, created_at
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=17099
+               ->  Parallel Seq Scan on public.orders  (cost=0.00..22307.33 rows=7 width=31) (actual time=2.843..56.785 rows=82.67 loops=3)
+                     Output: id, status, total_amount, created_at
+                     Filter: (orders.customer_id = 42)
+                     Rows Removed by Filter: 333251
+                     Buffers: shared hit=17099
+                     Worker 0:  actual time=0.906..54.039 rows=77.00 loops=1
+                       Buffers: shared hit=2818
+                     Worker 1:  actual time=0.946..54.221 rows=88.00 loops=1
+                       Buffers: shared hit=3086
+ Planning Time: 0.146 ms
+ Execution Time: 72.727 ms
+(24 rows)
+
+Time: 73.949 ms
+Time: 1495.398 ms (00:01.495)
+Time: 269.064 ms
+--- Phase 2: single-column (customer_id), trial 1/3 ---
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=862.27..862.32 rows=20 width=31) (actual time=0.928..0.937 rows=20.00 loops=1)
+   Output: id, status, total_amount, created_at
+   Buffers: shared hit=248 read=4
+   ->  Sort  (cost=862.27..862.85 rows=233 width=31) (actual time=0.926..0.930 rows=20.00 loops=1)
+         Output: id, status, total_amount, created_at
+         Sort Key: orders.created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=248 read=4
+         ->  Bitmap Heap Scan on public.orders  (cost=6.23..856.07 rows=233 width=31) (actual time=0.281..0.770 rows=248.00 loops=1)
+               Output: id, status, total_amount, created_at
+               Recheck Cond: (orders.customer_id = 42)
+               Heap Blocks: exact=245
+               Buffers: shared hit=248 read=4
+               ->  Bitmap Index Scan on idx_orders_customer_id  (cost=0.00..6.17 rows=233 width=0) (actual time=0.175..0.176 rows=248.00 loops=1)
+                     Index Cond: (orders.customer_id = 42)
+                     Index Searches: 1
+                     Buffers: shared hit=3 read=4
+ Planning:
+   Buffers: shared hit=24 read=1
+ Planning Time: 0.578 ms
+ Execution Time: 1.015 ms
+(21 rows)
+
+Time: 2.381 ms
+--- Phase 2: single-column (customer_id), trial 2/3 ---
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=862.27..862.32 rows=20 width=31) (actual time=0.910..0.918 rows=20.00 loops=1)
+   Output: id, status, total_amount, created_at
+   Buffers: shared hit=249
+   ->  Sort  (cost=862.27..862.85 rows=233 width=31) (actual time=0.908..0.912 rows=20.00 loops=1)
+         Output: id, status, total_amount, created_at
+         Sort Key: orders.created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=249
+         ->  Bitmap Heap Scan on public.orders  (cost=6.23..856.07 rows=233 width=31) (actual time=0.157..0.730 rows=248.00 loops=1)
+               Output: id, status, total_amount, created_at
+               Recheck Cond: (orders.customer_id = 42)
+               Heap Blocks: exact=245
+               Buffers: shared hit=249
+               ->  Bitmap Index Scan on idx_orders_customer_id  (cost=0.00..6.17 rows=233 width=0) (actual time=0.094..0.095 rows=248.00 loops=1)
+                     Index Cond: (orders.customer_id = 42)
+                     Index Searches: 1
+                     Buffers: shared hit=4
+ Planning Time: 0.112 ms
+ Execution Time: 1.011 ms
+(19 rows)
+
+Time: 1.731 ms
+--- Phase 2: single-column (customer_id), trial 3/3 ---
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=862.27..862.32 rows=20 width=31) (actual time=0.722..0.728 rows=20.00 loops=1)
+   Output: id, status, total_amount, created_at
+   Buffers: shared hit=249
+   ->  Sort  (cost=862.27..862.85 rows=233 width=31) (actual time=0.721..0.724 rows=20.00 loops=1)
+         Output: id, status, total_amount, created_at
+         Sort Key: orders.created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=249
+         ->  Bitmap Heap Scan on public.orders  (cost=6.23..856.07 rows=233 width=31) (actual time=0.173..0.594 rows=248.00 loops=1)
+               Output: id, status, total_amount, created_at
+               Recheck Cond: (orders.customer_id = 42)
+               Heap Blocks: exact=245
+               Buffers: shared hit=249
+               ->  Bitmap Index Scan on idx_orders_customer_id  (cost=0.00..6.17 rows=233 width=0) (actual time=0.109..0.110 rows=248.00 loops=1)
+                     Index Cond: (orders.customer_id = 42)
+                     Index Searches: 1
+                     Buffers: shared hit=4
+ Planning Time: 0.111 ms
+ Execution Time: 0.815 ms
+(19 rows)
+
+Time: 1.435 ms
+Time: 7.929 ms
+Time: 1715.087 ms (00:01.715)
+Time: 213.575 ms
+--- Phase 3: composite (customer_id, created_at DESC), trial 1/3 ---
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=63.69..63.73 rows=15 width=31) (actual time=1.170..1.181 rows=20.00 loops=1)
+   Output: id, status, total_amount, created_at
+   Buffers: shared hit=245 read=4
+   ->  Sort  (cost=63.69..63.73 rows=15 width=31) (actual time=1.167..1.173 rows=20.00 loops=1)
+         Output: id, status, total_amount, created_at
+         Sort Key: orders.created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=245 read=4
+         ->  Bitmap Heap Scan on public.orders  (cost=4.54..63.40 rows=15 width=31) (actual time=0.289..0.954 rows=248.00 loops=1)
+               Output: id, status, total_amount, created_at
+               Recheck Cond: (orders.customer_id = 42)
+               Heap Blocks: exact=245
+               Buffers: shared hit=245 read=4
+               ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..4.54 rows=15 width=0) (actual time=0.200..0.202 rows=248.00 loops=1)
+                     Index Cond: (orders.customer_id = 42)
+                     Index Searches: 1
+                     Buffers: shared read=4
+ Planning:
+   Buffers: shared hit=26 read=1
+ Planning Time: 0.723 ms
+ Execution Time: 1.280 ms
+(21 rows)
+
+Time: 2.708 ms
+--- Phase 3: composite, trial 2/3 ---
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=63.69..63.73 rows=15 width=31) (actual time=0.690..0.695 rows=20.00 loops=1)
+   Output: id, status, total_amount, created_at
+   Buffers: shared hit=249
+   ->  Sort  (cost=63.69..63.73 rows=15 width=31) (actual time=0.688..0.691 rows=20.00 loops=1)
+         Output: id, status, total_amount, created_at
+         Sort Key: orders.created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=249
+         ->  Bitmap Heap Scan on public.orders  (cost=4.54..63.40 rows=15 width=31) (actual time=0.146..0.565 rows=248.00 loops=1)
+               Output: id, status, total_amount, created_at
+               Recheck Cond: (orders.customer_id = 42)
+               Heap Blocks: exact=245
+               Buffers: shared hit=249
+               ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..4.54 rows=15 width=0) (actual time=0.090..0.090 rows=248.00 loops=1)
+                     Index Cond: (orders.customer_id = 42)
+                     Index Searches: 1
+                     Buffers: shared hit=4
+ Planning Time: 0.092 ms
+ Execution Time: 0.771 ms
+(19 rows)
+
+Time: 1.267 ms
+--- Phase 3: composite, trial 3/3 ---
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=63.69..63.73 rows=15 width=31) (actual time=0.726..0.731 rows=20.00 loops=1)
+   Output: id, status, total_amount, created_at
+   Buffers: shared hit=249
+   ->  Sort  (cost=63.69..63.73 rows=15 width=31) (actual time=0.724..0.727 rows=20.00 loops=1)
+         Output: id, status, total_amount, created_at
+         Sort Key: orders.created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=249
+         ->  Bitmap Heap Scan on public.orders  (cost=4.54..63.40 rows=15 width=31) (actual time=0.192..0.592 rows=248.00 loops=1)
+               Output: id, status, total_amount, created_at
+               Recheck Cond: (orders.customer_id = 42)
+               Heap Blocks: exact=245
+               Buffers: shared hit=249
+               ->  Bitmap Index Scan on idx_orders_customer_created_at  (cost=0.00..4.54 rows=15 width=0) (actual time=0.111..0.111 rows=248.00 loops=1)
+                     Index Cond: (orders.customer_id = 42)
+                     Index Searches: 1
+                     Buffers: shared hit=4
+ Planning Time: 0.102 ms
+ Execution Time: 0.812 ms
+(19 rows)
+
+Time: 1.374 ms
+--- Index sizes (this experiment) ---
+           index_name           | size  
+--------------------------------+-------
+ idx_orders_customer_created_at | 30 MB
+(1 row)
+
+Time: 3.818 ms
+===== EXPERIMENT 02 done — single-column index dropped on purpose =====
